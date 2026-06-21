@@ -308,7 +308,94 @@ let recognition = null;
 let isRecording = false;
 let lineChart = null;
 let pieChart = null;
+// ===== CODE เพิ่มเติมเพื่อเปิดระบบวิเคราะห์เสียงภาษาไทยแบบไม่ตัดคำ =====
 
+// 1. ฟังก์ชันสกัดข้อมูลจากคำพูด (ป้องกันสระ/วรรณยุกต์ภาษาไทยหาย)
+function parseVoiceText(text) {
+    if (!text) return null;
+    
+    // ทำความสะอาดข้อความและดึงตัวเลขออกมา (รองรับทั้ง คอนโด 3900 หรือ 15000 บาท)
+    let cleanText = text.trim();
+    let amountMatch = cleanText.match(/\d+([,.]\d+)?/);
+    if (!amountMatch) return null;
+    
+    let amount = parseFloat(amountMatch[0].replace(/,/g, ''));
+    
+    // หาข้อความอธิบายรายการ โดยการลบตัวเลขและคำว่า "บาท" ออกแบบปลอดภัย
+    let desc = cleanText.replace(/\d+([,.]\d+)?/g, '').replace(/บาท/g, '').trim();
+    
+    // ป้องกันกรณีคำอธิบายว่างเปล่า
+    if (desc === "") desc = "รายการทั่วไป";
+
+    // วิเคราะห์ว่าเป็น รายรับ หรือ รายจ่าย จากคำสำคัญ
+    let type = 'expense'; // ค่าเริ่มต้นเป็นรายจ่าย
+    const incomeKeywords = ['รับเงิน', 'ได้เงิน', 'เงินเดือน', 'ขายได้', 'รายได้', 'โบนัส', 'รับ'];
+    
+    for (let keyword of incomeKeywords) {
+        if (desc.includes(keyword)) {
+            type = 'income';
+            break;
+        }
+    }
+
+    // ค้นหาหมวดหมู่โดยอัตโนมัติจากคีย์เวิร์ดที่ตั้งไว้ด้านบน
+    let category = 'อื่นๆ';
+    const targetCats = type === 'income' ? CATEGORIES_INCOME : CATEGORIES_EXPENSE;
+    
+    for (let cat in targetCats) {
+        for (let keyword of targetCats[cat]) {
+            if (desc.includes(keyword)) {
+                category = cat;
+                break;
+            }
+        }
+    }
+
+    return {
+        id: Date.now(),
+        desc: desc,
+        amount: amount,
+        type: type,
+        category: category,
+        date: new Date().toISOString()
+    };
+}
+
+// 2. ฟังก์ชันตั้งค่าระบบไมโครโฟนรับเสียงภาษาไทย (Speech Recognition)
+function initVoiceRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        console.log("เบราว์เซอร์นี้ไม่รองรับระบบสั่งการด้วยเสียง");
+        return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.lang = 'th-TH'; // กำหนดเป็นภาษาไทย
+    recognition.continuous = false; // ปิดเพื่อให้ประมวลผลทันทีเมื่อพูดจบประโยคสั้น
+    recognition.interimResults = false;
+
+    // ตัวอย่างเหตุการณ์เมื่อพูดเสร็จแล้ว
+    recognition.onresult = function(event) {
+        let resultText = event.results[0][0].transcript;
+        
+        // นำข้อความที่พูดไปใส่ในช่องกรอก (Input Box) ในแอปของคุณ
+        // *หมายเหตุ: ตรวจสอบและเปลี่ยน ID ให้ตรงกับกล่องข้อความในแอปของคุณ*
+        const inputField = document.querySelector('.text-input'); 
+        if (inputField) {
+            inputField.value = resultText;
+            
+            // สั่งวิเคราะห์ผลทันทีหลังจากพูดจบ
+            let parsedData = parseVoiceText(resultText);
+            console.log("วิเคราะห์ผลลัพธ์:", parsedData);
+            // แสดงหน้าต่าง preview ข้อมูลเพื่อกดบันทึกต่อไป...
+        }
+    };
+}
+
+// เรียกใช้งานระบบเสียงทันทีเมื่อเปิดแอป
+document.addEventListener('DOMContentLoaded', () => {
+    initVoiceRecognition();
+});
 // ===== MONTHS =====
 const MONTHS_TH = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 const MONTHS_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
