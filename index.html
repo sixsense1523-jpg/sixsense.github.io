@@ -416,8 +416,8 @@ function setupVoice() {
   if (!SR) return;
   recognition = new SR();
   recognition.lang = 'th-TH';
-  recognition.continuous = false;
-  recognition.interimResults = true;
+  recognition.continuous = true;
+  recognition.interimResults = false;
   recognition.onresult = e => {
     let t = '';
     for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript;
