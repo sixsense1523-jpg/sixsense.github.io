@@ -32,7 +32,26 @@
   .month-nav button { background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 4px 10px; cursor: pointer; font-size: 14px; }
   .month-nav button:hover { color: var(--text); }
   .month-label { font-size: 14px; font-weight: 600; color: var(--text); min-width: 100px; text-align: center; }
+.section-divider { height: 1px; background: var(--border); margin: 8px 20px; }
+</style>
+</head>
+<body>
 
+<div class="topbar">
+  <h1>Fin<span>Voice</span></h1>
+  <div class="month-nav">
+    <button onclick="changeMonth(-1)">‹</button>
+    <span class="month-label" id="monthLabel"></span>
+    <button onclick="changeMonth(1)">›</button>
+  </div>
+</div>
+
+<!-- เพิ่มแผงปุ่มแท็บเลือกช่วงเวลา สัปดาห์ / เดือน / ปี ไว้ตรงนี้ -->
+<div class="tabs" style="margin-top: 4px; padding: 0 20px;">
+  <button class="tab" id="tabWeek" onclick="changeViewType('week')">สัปดาห์นี้</button>
+  <button class="tab active" id="tabMonth" onclick="changeViewType('month')">เดือนนี้</button>
+  <button class="tab" id="tabYear" onclick="changeViewType('year')">ปีนี้</button>
+</div>
   /* TABS */
   .tabs { display: flex; padding: 0 20px; gap: 6px; margin-bottom: 4px; }
   .tab { flex: 1; padding: 9px; text-align: center; font-size: 13px; font-weight: 600; border-radius: var(--radius-sm); cursor: pointer; border: none; background: var(--surface); color: var(--muted); transition: all 0.15s; }
@@ -309,7 +328,51 @@ let isRecording = false;
 let lineChart = null;
 let pieChart = null;
 // ===== CODE เพิ่มเติมเพื่อเปิดระบบวิเคราะห์เสียงภาษาไทยแบบไม่ตัดคำ =====
+let currentViewType = 'month'; // สถานะมุมมองเริ่มต้น
 
+function changeViewType(type) {
+  currentViewType = type;
+  
+  // สลับการไฮไลต์สีปุ่มให้ตรงกับที่เรากด
+  document.getElementById('tabWeek').classList.remove('active');
+  document.getElementById('tabMonth').classList.remove('active');
+  document.getElementById('tabYear').classList.remove('active');
+  
+  if (type === 'week') document.getElementById('tabWeek').classList.add('active');
+  if (type === 'month') document.getElementById('tabMonth').classList.add('active');
+  if (type === 'year') document.getElementById('tabYear').classList.add('active');
+  
+  // สั่งให้ระบบคำนวณและอัปเดตข้อมูลบนหน้าจอใหม่ตามเวลาที่เลือก
+  if (typeof updateUI === 'function') updateUI();
+  if (typeof render === 'function') render();
+}
+  function getFilteredEntries() {
+  const now = new Date();
+  
+  return entries.filter(entry => {
+    // ป้องกันกรณีวันที่ไม่มีข้อมูล หรือดึงมาเฉพาะส่วนวันที่ yyyy-mm-dd
+    if (!entry.date) return false;
+    const entryDate = new Date(entry.date.split('T')[0]);
+    
+    if (currentViewType === 'year') {
+      // 1. สรุปยอดรายปี: เช็กแค่ว่าปีตรงกันไหม
+      return entryDate.getFullYear() === currentYear;
+    } 
+    else if (currentViewType === 'week') {
+      // 2. สรุปยอดรายสัปดาห์: ดึงข้อมูลย้อนหลัง 7 วัน นับจากวันนี้
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(now.getDate() - 7);
+      // เคลียร์เวลาให้เป็น 00:00 เพื่อให้เทียบแค่วันที่ได้อย่างแม่นยำ
+      oneWeekAgo.setHours(0,0,0,0);
+      entryDate.setHours(0,0,0,0);
+      return entryDate >= oneWeekAgo && entryDate <= now;
+    } 
+    else {
+      // 3. สรุปยอดรายเดือน (ระบบเดิม): เช็กทั้งปีและเดือนตรงกัน
+      return entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth;
+    }
+  });
+}
 // 1. ฟังก์ชันสกัดข้อมูลจากคำพูด (ป้องกันสระ/วรรณยุกต์ภาษาไทยหาย)
 function parseVoiceText(text) {
     if (!text) return null;
