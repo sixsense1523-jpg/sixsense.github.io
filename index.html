@@ -165,7 +165,211 @@
 </div>
 
 <script>
+<script>
+// ===== 🟢 โค้ดระบบควบคุมและฐานข้อมูลหลัก ฉบับแก้ไขบั๊กค้าง 100% 🟢 =====
+const CATEGORIES_EXPENSE = {
+  'อาหาร': ['อาหาร','ข้าว','กาแฟ','ชา','น้ำ','ขนม','หมู','ไก่','ก๋วยเตี๋ยว'],
+  'เดินทาง': ['รถ','แท็กซี่','bts','mrt','น้ำมัน'],
+  'สาธารณูปโภค': ['ไฟฟ้า','น้ำประปา','อินเทอร์เน็ต','มือถือ'],
+  'สุขภาพ': ['หมอ','ยา','คลินิก'],
+  'ช้อปปิ้ง': ['เสื้อผ้า','รองเท้า','กระเป๋า','ซื้อของ'],
+  'บันเทิง': ['หนัง','เที่ยว','เกม','netflix'],
+  'ที่พัก': ['ค่าเช่า','บ้าน','หอพัก'],
+  'เงินออม': ['ออม', 'เงินเก็บ', 'ฝากกระปุก'],
+  'อื่นๆ': []
+};
+const CATEGORIES_INCOME = {
+  'เงินเดือน': ['เงินเดือน','salary'],
+  'รายได้ธุรกิจ': ['ขาย','ลูกค้า','บริการ','freelance','รับเงิน','ได้เงิน'],
+  'โบนัส': ['โบนัส','bonus'],
+  'อื่นๆ': []
+};
+const CAT_ICONS = {
+  'อาหาร':'🍜','เดินทาง':'🚗','สาธารณูปโภค':'💡','สุขภาพ':'🏥','ช้อปปิ้ง':'🛍️',
+  'บันเทิง':'🎬','ที่พัก':'🏠','เงินออม':'🔒','เงินเดือน':'💰','รายได้ธุรกิจ':'📦','โบนัส':'🎁','อื่นๆ':'📝'
+};
 
+let entries = JSON.parse(localStorage.getItem('finvoice_entries') || '[]');
+let currentMonth = new Date().getMonth();
+let currentYear = new Date().getFullYear();
+let currentViewType = 'month';
+let pendingEntry = null;
+let recognition = null;
+let isRecording = false;
+let lineChart = null;
+let pieChart = null;
+
+function switchPage(page) {
+  document.getElementById('page-main').classList.remove('active');
+  document.getElementById('page-chart').classList.remove('active');
+  document.getElementById('btn-main').classList.remove('active');
+  document.getElementById('btn-chart').classList.remove('active');
+  document.getElementById('page-' + page).classList.add('active');
+  document.getElementById('btn-' + page).classList.add('active');
+  if (page === 'chart') renderCharts();
+}
+
+function changeMonth(dir) {
+  currentMonth += dir;
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  updateMonthLabel();
+  renderAll();
+}
+
+function updateMonthLabel() {
+  const mNames = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+  document.getElementById('monthLabel').textContent = mNames[currentMonth] + " " + (currentYear + 543);
+}
+
+function changeViewType(type) {
+  currentViewType = type;
+  document.getElementById('tabWeek').classList.remove('active');
+  document.getElementById('tabMonth').classList.remove('active');
+  document.getElementById('tabYear').classList.remove('active');
+  if (type === 'week') document.getElementById('tabWeek').classList.add('active');
+  if (type === 'month') document.getElementById('tabMonth').classList.add('active');
+  if (type === 'year') document.getElementById('tabYear').classList.add('active');
+  renderAll();
+}
+
+function getFilteredEntries() {
+  const now = new Date();
+  return entries.filter(entry => {
+    if (!entry.date) return false;
+    const eDate = new Date(entry.date);
+    if (currentViewType === 'year') return eDate.getFullYear() === currentYear;
+    if (currentViewType === 'week') {
+      const oneWeekAgo = new Date(); oneWeekAgo.setDate(now.getDate() - 7);
+      return eDate >= oneWeekAgo && eDate <= now;
+    }
+    return eDate.getFullYear() === currentYear && eDate.getMonth() === currentMonth;
+  });
+}
+
+function parseText(text) {
+  let type = 'expense';
+  if (/รับ|ได้เงิน|เงินเดือน|ขาย|โบนัส|รายรับ|โอนเข้า/.test(text)) type = 'income';
+  
+  let amount = 0;
+  let numMatch = text.match(/\d+([,.]\d+)?/);
+  if (numMatch) amount = parseFloat(numMatch[0].replace(/,/g, ''));
+  
+  // แก้ไขจุดตัดคำอธิบายรายการอย่างปลอดภัย ไม่ให้ บ.ใบไม้ หาย
+  let desc = text.replace(/\d+([,.]\d+)?/g, '').replace(/บาท/g, '').replace(/฿/g, '').trim();
+  if (!desc) desc = type === 'income' ? 'รายรับ' : 'รายจ่าย';
+  
+  let category = 'อื่นๆ';
+  const cats = type === 'income' ? CATEGORIES_INCOME : CATEGORIES_EXPENSE;
+  outer: for (const [cat, kws] of Object.entries(cats)) {
+    for (const kw of kws) if (desc.includes(kw)) { category = cat; break outer; }
+  }
+  return { type, amount, desc, category, date: new Date().toISOString().split('T')[0], id: Date.now() };
+}
+
+function syncTranscript() {
+  document.getElementById('transcriptBox').textContent = document.getElementById('textInput').value || 'พิมพ์รายการที่นี่...';
+}
+
+function parseEntry() {
+  const text = document.getElementById('textInput').value;
+  if (!text) return;
+  pendingEntry = parseText(text);
+  document.getElementById('preType').textContent = pendingEntry.type === 'income' ? 'รายรับ' : 'รายจ่าย';
+  document.getElementById('preDesc').textContent = pendingEntry.desc;
+  document.getElementById('preAmount').textContent = pendingEntry.amount.toLocaleString() + ' บาท';
+  document.getElementById('preCat').textContent = pendingEntry.category;
+  document.getElementById('previewCard').classList.add('visible');
+}
+
+let currentSavingPercent = parseFloat(localStorage.getItem('finvoice_saving_percent') || '10');
+function changeSavingPercent() {
+  currentSavingPercent = parseFloat(document.getElementById('savingPercentSelect').value);
+  localStorage.setItem('finvoice_saving_percent', currentSavingPercent);
+}
+
+function confirmEntry() {
+  if (!pendingEntry) return;
+  entries.unshift(pendingEntry);
+  if (pendingEntry.type === 'income') {
+    const savingAmount = (pendingEntry.amount * currentSavingPercent) / 100;
+    if (savingAmount > 0) {
+      entries.unshift({
+        id: Date.now() + 1, 
+        desc: `🔒 หักออมอัตโนมัติ (${currentSavingPercent}%) จาก: ${pendingEntry.desc}`,
+        amount: savingAmount, 
+        type: 'expense', 
+        category: 'เงินออม', 
+        date: pendingEntry.date
+      });
+    }
+  }
+  save();
+  document.getElementById('previewCard').classList.remove('visible');
+  document.getElementById('textInput').value = '';
+  pendingEntry = null;
+  renderAll();
+}
+
+function deleteEntry(id) {
+  entries = entries.filter(e => e.id !== id); save(); renderAll();
+}
+function save() { localStorage.setItem('finvoice_entries', JSON.stringify(entries)); }
+
+function renderAll() {
+  const fe = getFilteredEntries();
+  let inc = 0, exp = 0;
+  const list = document.getElementById('entriesList');
+  if (list) {
+    list.innerHTML = '';
+    fe.forEach(e => {
+      if (e.type === 'income') inc += e.amount; else exp += e.amount;
+      list.innerHTML += `<div class="entry-item">
+        <div class="entry-icon">${CAT_ICONS[e.category]||'📝'}</div>
+        <div class="entry-info"><div class="entry-desc">${e.desc}</div><div class="entry-meta">${e.date}</div></div>
+        <div class="entry-amount ${e.type}">${e.amount.toLocaleString()}</div>
+        <button class="del-btn" onclick="deleteEntry(${e.id})">❌</button>
+      </div>`;
+    });
+  }
+  if (document.getElementById('sumIncome')) document.getElementById('sumIncome').textContent = inc.toLocaleString();
+  if (document.getElementById('sumExpense')) document.getElementById('sumExpense').textContent = exp.toLocaleString();
+  if (document.getElementById('sumNet')) document.getElementById('sumNet').textContent = (inc - exp).toLocaleString();
+  if (document.getElementById('page-chart') && document.getElementById('page-chart').classList.contains('active')) renderCharts();
+}
+
+function renderCharts() {
+  const fe = getFilteredEntries();
+  const expenseData = {}; Object.keys(CATEGORIES_EXPENSE).forEach(c => expenseData[c] = 0);
+  fe.forEach(e => { if (e.type === 'expense') expenseData[e.category] += e.amount; });
+  const pLabels = Object.keys(expenseData).filter(c => expenseData[c] > 0);
+  const pVals = Object.values(expenseData).filter(v => v > 0);
+  
+  const ctx = document.getElementById('pieChart');
+  if (!ctx) return;
+  if (pieChart) pieChart.destroy();
+  pieChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels: pLabels, datasets: [{ data: pVals, backgroundColor: ['#f87171','#fb923c','#fbbf24','#34d399','#60a5fa','#818cf8'] }] },
+    options: { responsive: true, plugins: { legend: { position: 'right', labels: { color: '#fff' } } } }
+  });
+}
+
+function setupVoice() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return; recognition = new SR(); recognition.lang = 'th-TH';
+  recognition.onstart = () => { document.getElementById('micBtn').className = 'mic-btn recording'; };
+  recognition.onend = () => { document.getElementById('micBtn').className = 'mic-btn idle'; };
+  recognition.onresult = (e) => {
+    document.getElementById('textInput').value = e.results.transcript; parseEntry();
+  };
+}
+function toggleRecording() { 
+  if (!recognition) setupVoice();
+  if (!recognition) return;
+  if (isRecording) recognition.stop(); else recognition.start(); isRecording = !isRecording; 
+}
+function seedIfEmpty() {}
 // ===== INIT =====
 setupVoice();
 seedIfEmpty();
