@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0f172a">
 <title>บัญชีเสียง — FinVoice</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cloudflare.com"></script>
 <style>
   :root {
     --bg: #0f172a;
@@ -24,7 +24,6 @@
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; min-height: 100vh; max-width: 430px; margin: 0 auto; overflow-x: hidden; }
 
-  /* NAV & TOPBAR */
   .topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 8px; position: sticky; top: 0; background: var(--bg); z-index: 50; }
   .topbar h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: var(--text); }
   .topbar h1 span { color: var(--accent); }
@@ -33,12 +32,10 @@
   .month-nav button:hover { color: var(--text); }
   .month-label { font-size: 14px; font-weight: 600; color: var(--text); min-width: 100px; text-align: center; }
 
-  /* TABS */
   .tabs { display: flex; padding: 0 20px; gap: 6px; margin-bottom: 4px; }
   .tab { flex: 1; padding: 9px; text-align: center; font-size: 13px; font-weight: 600; border-radius: var(--radius-sm); cursor: pointer; border: none; background: var(--surface); color: var(--muted); transition: all 0.15s; }
   .tab.active { background: var(--accent); color: #fff; }
 
-  /* SUMMARY CARDS */
   .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px 20px; }
   .summary-full { grid-column: 1 / -1; }
   .card { background: var(--surface); border-radius: var(--radius); padding: 14px 16px; border: 1px solid var(--border); }
@@ -51,7 +48,6 @@
   .card-val.net.zero { color: var(--muted); }
   .net-row { display: flex; justify-content: space-between; align-items: center; }
 
-  /* VOICE INPUT */
   .voice-section { padding: 0 20px 12px; }
   .voice-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
   .voice-card h3 { font-size: 13px; color: var(--muted); margin-bottom: 12px; font-weight: 500; }
@@ -68,7 +64,6 @@
   .parse-btn { background: var(--accent); border: none; color: #fff; border-radius: var(--radius-sm); padding: 10px 16px; cursor: pointer; font-size: 14px; font-weight: 600; white-space: nowrap; }
   .parse-btn:hover { opacity: 0.9; }
 
-  /* PARSED PREVIEW */
   .preview-card { background: var(--surface2); border-radius: var(--radius-sm); padding: 12px; border: 1px solid var(--border); margin-bottom: 10px; display: none; }
   .preview-card.visible { display: block; }
   .preview-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 13px; }
@@ -81,7 +76,6 @@
   .confirm-btn { width: 100%; background: var(--income); border: none; color: #0f172a; border-radius: var(--radius-sm); padding: 11px; cursor: pointer; font-size: 14px; font-weight: 700; }
   .confirm-btn.expense-confirm { background: var(--expense); }
 
-  /* LIST & ITEMS */
   .list-section { padding: 0 20px 100px; }
   .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .list-header h2 { font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
@@ -102,7 +96,27 @@
   .del-btn:hover { color: var(--expense); }
   .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; }
 
-  /* PAGE VISIBILITY */
+  .chart-section { padding: 0 20px 100px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+  .chart-title { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .chart-wrap { position: relative; }
+  .cat-list { margin-top: 8px; }
+  .cat-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+  .cat-bar-wrap { flex: 1; background: var(--surface2); border-radius: 4px; height: 6px; overflow: hidden; }
+  .cat-bar { height: 100%; border-radius: 4px; background: var(--expense); transition: width 0.5s; }
+  .cat-bar.income { background: var(--income); }
+  .cat-name { width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cat-pct { width: 35px; text-align: right; color: var(--muted); font-size: 12px; }
+  .cat-val { width: 70px; text-align: right; font-weight: 600; }
+
+  .nav-bottom { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 430px; background: rgba(30,41,59,0.95); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-top: 1px solid var(--border); display: flex; padding: 8px 12px; z-index: 100; }
+  .nav-btn { flex: 1; background: none; border: none; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; font-size: 11px; font-weight: 500; padding: 6px 0; }
+  .nav-btn.active { color: var(--accent); }
+  .nav-btn span { font-size: 20px; }
+
+  .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px); background: #334155; color: #fff; padding: 10px 20px; border-radius: 30px; font-size: 13px; font-weight: 500; opacity: 0; pointer-events: none; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1000; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); border: 1px solid var(--border); white-space: nowrap; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
   .page { display: none; }
   .page.active { display: block; }
   .section-divider { height: 1px; background: var(--border); margin: 8px 20px; }
@@ -119,302 +133,10 @@
   </div>
 </div>
 
-<!-- ปุ่มแท็บเลือกช่วงเวลา สัปดาห์ / เดือน / ปี ไว้ตรงนี้ -->
 <div class="tabs" style="margin-top: 4px; padding: 0 20px;">
   <button class="tab" id="tabWeek" onclick="changeViewType('week')">สัปดาห์นี้</button>
   <button class="tab active" id="tabMonth" onclick="changeViewType('month')">เดือนนี้</button>
-  <button class="tab" id="tabYear" onclick="changeViewType('year')">ปีนี้</button>
-</div>
- <!-- วางแผนออมเงินอัตโนมัติ -->
-<div class="card" style="margin: 10px 20px; background: var(--surface2);">
-  <div class="card-label" style="color: var(--income);">🛡️ ระบบออมเงินอัตโนมัติก่อนใช้</div>
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
-    <span style="font-size: 13px; color: var(--muted);">สัดส่วนการออมปัจจุบัน:</span>
-    <select id="savingPercentSelect" onchange="changeSavingPercent()" style="background: var(--surface); color: var(--text); border: 1px solid var(--border); padding: 4px 8px; border-radius: 6px; font-weight: 600;">
-      <option value="10">10% (เริ่มต้นสร้างนิสัย)</option>
-      <option value="15">15% (ท้าทายตัวเอง)</option>
-      <option value="20">20% (นักออมมืออาชีพ)</option>
-    </select>
-  </div>
-  <div style="font-size: 11px; color: var(--muted); margin-top: 6px; font-style: italic;">
-    *เมื่อมีรายรับเข้ามา ระบบจะหักเงินออมเข้ากองทุนออมให้อัตโนมัติทันที
-  </div>
-</div>
-  <!-- Summary -->
-  <div class="summary">
-    <div class="card">
-      <div class="card-label">รายรับ</div>
-      <div class="card-val income" id="totalIncome">฿0</div>
-    </div>
-    <div class="card">
-      <div class="card-label">รายจ่าย</div>
-      <div class="card-val expense" id="totalExpense">฿0</div>
-    </div>
-    <div class="card summary-full">
-      <div class="net-row">
-        <div>
-          <div class="card-label">คงเหลือสุทธิ</div>
-          <div class="card-val net zero" id="totalNet">฿0</div>
-        </div>
-        <div style="text-align:right">
-          <div class="card-label">บันทึกแล้ว</div>
-          <div style="font-size:22px;font-weight:700;" id="totalCount">0 รายการ</div>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <!-- Voice Input -->
-  <div class="voice-section">
-    <div class="voice-card">
-      <h3>🎙️ บันทึกด้วยเสียงหรือพิมพ์</h3>
-      <button class="mic-btn idle" id="micBtn" onclick="toggleRecord()">🎤</button>
-      <p class="voice-hint" id="voiceHint">กดปุ่มไมค์เพื่อพูด หรือพิมพ์ด้านล่าง</p>
-      <div class="transcript-box" id="transcriptBox">ตัวอย่าง: "จ่ายค่าอาหาร 150 บาท" หรือ "รับเงิน 5000 จากลูกค้า"</div>
-      <div class="text-row">
-        <input class="text-input" id="textInput" placeholder="พิมพ์รายการบัญชีที่นี่..." oninput="syncTranscript()" onkeydown="if(event.key==='Enter')parseEntry()">
-        <button class="parse-btn" onclick="parseEntry()">วิเคราะห์</button>
-      </div>
-
-      <!-- Preview -->
-      <div class="preview-card" id="previewCard">
-        <div class="preview-row">
-          <span class="preview-key">ประเภท</span>
-          <span id="previewType"></span>
-        </div>
-        <div class="preview-row">
-          <span class="preview-key">รายการ</span>
-          <span class="preview-val" id="previewDesc"></span>
-        </div>
-        <div class="preview-row">
-          <span class="preview-key">จำนวนเงิน</span>
-          <span class="preview-val" id="previewAmount"></span>
-        </div>
-        <div class="preview-row">
-          <span class="preview-key">หมวดหมู่</span>
-          <span class="preview-val" id="previewCat"></span>
-        </div>
-        <div class="preview-row" style="margin-top:4px;">
-          <span class="preview-key">วันที่</span>
-          <span class="preview-val" id="previewDate"></span>
-        </div>
-        <button class="confirm-btn" id="confirmBtn" style="margin-top:10px;" onclick="confirmEntry()">✓ ยืนยันบันทึก</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Recent -->
-  <div style="padding: 0 20px;">
-    <div class="list-header">
-      <h2>รายการล่าสุด</h2>
-    </div>
-    <div id="recentList"></div>
-  </div>
-</div>
-
-<!-- HISTORY PAGE -->
-<div id="page-history" class="page">
-  <div class="list-section">
-    <div class="list-header">
-      <h2>รายการทั้งหมด</h2>
-      <div class="filter-row">
-        <button class="filter-btn active" id="f-all" onclick="setFilter('all')">ทั้งหมด</button>
-        <button class="filter-btn" id="f-income" onclick="setFilter('income')">รายรับ</button>
-        <button class="filter-btn" id="f-expense" onclick="setFilter('expense')">รายจ่าย</button>
-      </div>
-    </div>
-    <div id="fullList"></div>
-  </div>
-</div>
-
-<!-- CHART PAGE -->
-<div id="page-chart" class="page">
-  <div class="chart-section">
-
-    <div class="chart-card">
-      <div class="chart-title">รายรับ vs รายจ่าย (7 วันล่าสุด)</div>
-      <div class="chart-wrap" style="height:200px;">
-        <canvas id="lineChart" role="img" aria-label="กราฟรายรับรายจ่าย 7 วันล่าสุด">กราฟแสดงรายรับและรายจ่าย 7 วันล่าสุด</canvas>
-      </div>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-title">สัดส่วนรายจ่ายตามหมวดหมู่</div>
-      <div class="chart-wrap" style="height:200px;">
-        <canvas id="pieChart" role="img" aria-label="กราฟวงกลมแสดงสัดส่วนรายจ่ายตามหมวดหมู่">กราฟวงกลมหมวดหมู่รายจ่าย</canvas>
-      </div>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-title">หมวดหมู่รายจ่ายสูงสุด</div>
-      <div class="cat-list" id="catBreakdown"></div>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-title">สรุปข้อมูล</div>
-      <div id="statsSummary" style="font-size:13px;line-height:1.8;color:var(--muted);"></div>
-    </div>
-  </div>
-</div>
-
-<!-- TOAST -->
-<div class="toast" id="toast"></div>
-
-<script>
-// ===== DATA =====
-const CATEGORIES_EXPENSE = {
-  'อาหาร': ['อาหาร','ข้าว','กาแฟ','ชา','น้ำ','ขนม','ร้านอาหาร','ฟาสต์ฟู้ด','เบเกอรี่','ส้มตำ','ก๋วยเตี๋ยว','หมู','ไก่','ปลา','ผัก','ผลไม้'],
-  'เดินทาง': ['รถ','แท็กซี่','กrab','grab','แกร็บ','BTS','MRT','บัส','รถไฟ','เบนซิน','น้ำมัน','ที่จอดรถ','ตั๋ว','เที่ยวบิน','แอร์พอร์ต'],
-  'สาธารณูปโภค': ['ไฟฟ้า','น้ำประปา','น้ำ','อินเทอร์เน็ต','เน็ต','โทรศัพท์','มือถือ','ค่าโทร'],
-  'สุขภาพ': ['หมอ','ยา','คลินิก','โรงพยาบาล','ฟิตเนส','ออกกำลังกาย'],
-  'ช้อปปิ้ง': ['เสื้อผ้า','รองเท้า','กระเป๋า','ซื้อของ','ช้อปปิ้ง','mall','ห้าง'],
-  'บันเทิง': ['หนัง','cinema','คอนเสิร์ต','เที่ยว','ท่องเที่ยว','เกม','Netflix'],
-  'ที่พัก': ['เช่า','ค่าเช่า','บ้าน','หอพัก','คอนโด','โรงแรม'],
-  'ธุรกิจ': ['อุปกรณ์','เครื่องใช้','สำนักงาน','ออฟฟิศ','พนักงาน','เงินเดือน','จ้าง'],
-  'อื่นๆ': []
-};
-const CATEGORIES_INCOME = {
-  'เงินเดือน': ['เงินเดือน','salary','ค่าจ้าง','ค่าตอบแทน'],
-  'รายได้ธุรกิจ': ['ขาย','ลูกค้า','บริการ','โปรเจกต์','งาน','รับงาน','freelance'],
-  'โบนัส': ['โบนัส','bonus','รางวัล','เงินพิเศษ'],
-  'ดอกเบี้ย': ['ดอกเบี้ย','ปันผล','dividend'],
-  'อื่นๆ': []
-};
-const CAT_ICONS = {
-  'อาหาร':'🍜','เดินทาง':'🚗','สาธารณูปโภค':'💡','สุขภาพ':'🏥','ช้อปปิ้ง':'🛍️',
-  'บันเทิง':'🎬','ที่พัก':'🏠','ธุรกิจ':'💼','เงินเดือน':'💰','รายได้ธุรกิจ':'📦',
-  'โบนัส':'🎁','ดอกเบี้ย':'📈','อื่นๆ':'📝'
-};
-
-let entries = JSON.parse(localStorage.getItem('finvoice_entries') || '[]');
-let currentMonth = new Date().getMonth();
-let currentYear = new Date().getFullYear();
-let currentFilter = 'all';
-let pendingEntry = null;
-let recognition = null;
-let isRecording = false;
-let lineChart = null;
-let pieChart = null;
-// ===== CODE เพิ่มเติมเพื่อเปิดระบบวิเคราะห์เสียงภาษาไทยแบบไม่ตัดคำ =====
-let currentViewType = 'month'; // สถานะมุมมองเริ่มต้น
-
-// ===== 🟢 โค้ดชุดจัดการควบคุมปุ่มเวลา ระบบออมเงิน และกราฟฉบับสมบูรณ์ 🟢 =====
-
-let currentViewType = 'month'; // สถานะมุมมองเริ่มต้น
-
-function changeViewType(type) {
-  currentViewType = type;
-  
-  // 1. สลับไฮไลต์ปุ่มช่วงเวลาให้ถูกต้อง
-  const tabW = document.getElementById('tabWeek');
-  const tabM = document.getElementById('tabMonth');
-  const tabY = document.getElementById('tabYear');
-  
-  if (tabW) tabW.classList.remove('active');
-  if (tabM) tabM.classList.remove('active');
-  if (tabY) tabY.classList.remove('active');
-  
-  if (type === 'week' && tabW) tabW.classList.add('active');
-  if (type === 'month' && tabM) tabM.classList.add('active');
-  if (type === 'year' && tabY) tabY.classList.add('active');
-  
-  // 2. สั่งรีเฟรชข้อมูลและกราฟพร้อมกันตามฟังก์ชันดั้งเดิมของแอป
-  if (typeof renderAll === 'function') renderAll();
-  if (typeof renderCharts === 'function') renderCharts();
-}
-
-// ฟังก์ชันคัดกรองข้อมูลรายรับ-รายจ่ายตามช่วงเวลา ปุ่มสัปดาห์/เดือน/ปี
-function getFilteredEntries() {
-  const now = new Date();
-  
-  return entries.filter(entry => {
-    if (!entry.date) return false;
-    const entryDate = new Date(entry.date.split('T')[0]);
-    
-    if (currentViewType === 'year') {
-      // 1. สรุปยอดรายปี: ปีตรงกัน
-      return entryDate.getFullYear() === currentYear;
-    } 
-    else if (currentViewType === 'week') {
-      // 2. สรุปยอดรายสัปดาห์: ย้อนหลัง 7 วันนับจากวันนี้
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(now.getDate() - 7);
-      oneWeekAgo.setHours(0,0,0,0);
-      entryDate.setHours(0,0,0,0);
-      return entryDate >= oneWeekAgo && entryDate <= now;
-    } 
-    else {
-      // 3. สรุปยอดรายเดือนแบบเดิม: เดือนและปีตรงกัน
-      return entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth;
-    }
-  });
-}
-
-// ตัวแปรหักเปอร์เซ็นต์การออมเงินอัตโนมัติ
-let currentSavingPercent = parseFloat(localStorage.getItem('finvoice_saving_percent') || '10');
-
-function changeSavingPercent() {
-  const select = document.getElementById('savingPercentSelect');
-  if (select) {
-    currentSavingPercent = parseFloat(select.value);
-    localStorage.setItem('finvoice_saving_percent', currentSavingPercent);
-    if (typeof showToast === 'function') {
-      showToast(`🎯 ปรับเป้าหมายออมเงินเป็น ${currentSavingPercent}% แล้ว`);
-    }
-  }
-}
-
-// แทรกระบบตัดเงินออมอัตโนมัติเข้าไปในระบบบันทึกเงินหลักอย่างปลอดภัย
-function confirmEntry() {
-  if (!pendingEntry) return;
-
-  // 1. บันทึกรายการหลักลงไปก่อน
-  entries.unshift(pendingEntry);
-
-  // 🛡️ หากรายการหลักคือ "รายรับ (income)" ให้ทำการตัดยอดออมทันที
-  if (pendingEntry.type === 'income') {
-    const savingPercent = parseFloat(localStorage.getItem('finvoice_saving_percent') || '10');
-    const savingAmount = (pendingEntry.amount * savingPercent) / 100;
-
-    if (savingAmount > 0) {
-      const savingEntry = {
-        id: Date.now() + 1,
-        desc: `🔒 หักออมอัตโนมัติ (${savingPercent}%) จาก: ${pendingEntry.desc}`,
-        amount: savingAmount,
-        type: 'expense', // ตีเป็นยอดโอนไปเก็บแยกบัญชีกินใช้
-        category: 'เงินออม',
-        date: pendingEntry.date
-      };
-      entries.unshift(savingEntry);
-    }
-  }
-
-  // 2. เซฟค่าและเคลียร์หน้าจอตามโค้ดเดิมทั้งหมด
-  if (typeof save === 'function') save();
-  if (typeof showToast === 'function') {
-    showToast(pendingEntry.type === 'income' ? '✅ บันทึกรายรับแล้ว' : '✅ บันทึกรายจ่ายแล้ว');
-  }
-  
-  const pCard = document.getElementById('previewCard');
-  if (pCard) pCard.classList.remove('visible');
-  
-  const tInput = document.getElementById('textInput');
-  if (tInput) tInput.value = '';
-  
-  const tBox = document.getElementById('transcriptBox');
-  if (tBox) tBox.textContent = 'ตัวอย่าง: "จ่ายค่าอาหาร 150 บาท" หรือ "รับเงิน 5000 จากลูกค้า"';
-  
-  pendingEntry = null;
-  if (typeof renderAll === 'function') renderAll();
-}
-
-// ตั้งค่าดรอปดาวน์ให้จำค่าเดิมเสมอเมื่อเปิดแอปพลิเคชันขึ้นมาครั้งแรก
-document.addEventListener('DOMContentLoaded', () => {
-  if (typeof initVoiceRecognition === 'function') initVoiceRecognition();
-  
-  const savedPercent = localStorage.getItem('finvoice_saving_percent') || '10';
-  const selectBox = document.getElementById('savingPercentSelect');
-  if (selectBox) selectBox.value = savedPercent;
 });
 
 // ===== INIT =====
