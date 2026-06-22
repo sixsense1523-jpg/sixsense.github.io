@@ -298,486 +298,124 @@ let pieChart = null;
 // ===== CODE เพิ่มเติมเพื่อเปิดระบบวิเคราะห์เสียงภาษาไทยแบบไม่ตัดคำ =====
 let currentViewType = 'month'; // สถานะมุมมองเริ่มต้น
 
+// ===== 🟢 โค้ดชุดจัดการควบคุมปุ่มเวลา ระบบออมเงิน และกราฟฉบับสมบูรณ์ 🟢 =====
+
+let currentViewType = 'month'; // สถานะมุมมองเริ่มต้น
+
 function changeViewType(type) {
   currentViewType = type;
   
-  // สลับการไฮไลต์สีปุ่มให้ตรงกับที่เรากด
-  document.getElementById('tabWeek').classList.remove('active');
-  document.getElementById('tabMonth').classList.remove('active');
-  document.getElementById('tabYear').classList.remove('active');
+  // 1. สลับไฮไลต์ปุ่มช่วงเวลาให้ถูกต้อง
+  const tabW = document.getElementById('tabWeek');
+  const tabM = document.getElementById('tabMonth');
+  const tabY = document.getElementById('tabYear');
   
-  if (type === 'week') document.getElementById('tabWeek').classList.add('active');
-  if (type === 'month') document.getElementById('tabMonth').classList.add('active');
-  if (type === 'year') document.getElementById('tabYear').classList.add('active');
+  if (tabW) tabW.classList.remove('active');
+  if (tabM) tabM.classList.remove('active');
+  if (tabY) tabY.classList.remove('active');
   
-  // สั่งให้ระบบคำนวณและอัปเดตข้อมูลบนหน้าจอใหม่ตามเวลาที่เลือก
-  if (typeof renderAll === 'function') renderAll(); 
-  if (typeof renderCharts === 'function') renderCharts(); 
+  if (type === 'week' && tabW) tabW.classList.add('active');
+  if (type === 'month' && tabM) tabM.classList.add('active');
+  if (type === 'year' && tabY) tabY.classList.add('active');
+  
+  // 2. สั่งรีเฟรชข้อมูลและกราฟพร้อมกันตามฟังก์ชันดั้งเดิมของแอป
+  if (typeof renderAll === 'function') renderAll();
+  if (typeof renderCharts === 'function') renderCharts();
 }
-  function getFilteredEntries() {
+
+// ฟังก์ชันคัดกรองข้อมูลรายรับ-รายจ่ายตามช่วงเวลา ปุ่มสัปดาห์/เดือน/ปี
+function getFilteredEntries() {
   const now = new Date();
   
   return entries.filter(entry => {
-    // ป้องกันกรณีวันที่ไม่มีข้อมูล หรือดึงมาเฉพาะส่วนวันที่ yyyy-mm-dd
     if (!entry.date) return false;
     const entryDate = new Date(entry.date.split('T')[0]);
     
     if (currentViewType === 'year') {
-      // 1. สรุปยอดรายปี: เช็กแค่ว่าปีตรงกันไหม
+      // 1. สรุปยอดรายปี: ปีตรงกัน
       return entryDate.getFullYear() === currentYear;
     } 
     else if (currentViewType === 'week') {
-      // 2. สรุปยอดรายสัปดาห์: ดึงข้อมูลย้อนหลัง 7 วัน นับจากวันนี้
+      // 2. สรุปยอดรายสัปดาห์: ย้อนหลัง 7 วันนับจากวันนี้
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(now.getDate() - 7);
-      // เคลียร์เวลาให้เป็น 00:00 เพื่อให้เทียบแค่วันที่ได้อย่างแม่นยำ
       oneWeekAgo.setHours(0,0,0,0);
       entryDate.setHours(0,0,0,0);
       return entryDate >= oneWeekAgo && entryDate <= now;
     } 
     else {
-      // 3. สรุปยอดรายเดือน (ระบบเดิม): เช็กทั้งปีและเดือนตรงกัน
+      // 3. สรุปยอดรายเดือนแบบเดิม: เดือนและปีตรงกัน
       return entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth;
     }
   });
 }
-// 1. ฟังก์ชันสกัดข้อมูลจากคำพูด (ป้องกันสระ/วรรณยุกต์ภาษาไทยหาย)
-function parseVoiceText(text) {
-    if (!text) return null;
-    
-    // ทำความสะอาดข้อความและดึงตัวเลขออกมา (รองรับทั้ง คอนโด 3900 หรือ 15000 บาท)
-    let cleanText = text.trim();
-    let amountMatch = cleanText.match(/\d+([,.]\d+)?/);
-    if (!amountMatch) return null;
-    
-    let amount = parseFloat(amountMatch[0].replace(/,/g, ''));
-    
-    // หาข้อความอธิบายรายการ โดยการลบตัวเลขและคำว่า "บาท" ออกแบบปลอดภัย
-    let desc = cleanText.replace(/\d+([,.]\d+)?/g, '').replace(/บาท/g, '').trim();
-    // ป้องกันกรณีคำอธิบายว่างเปล่า
-    if (desc === "") desc = "รายการทั่วไป";
 
-    // วิเคราะห์ว่าเป็น รายรับ หรือ รายจ่าย จากคำสำคัญ
-    let type = 'expense'; // ค่าเริ่มต้นเป็นรายจ่าย
-    const incomeKeywords = ['รับเงิน', 'ได้เงิน', 'เงินเดือน', 'ขายได้', 'รายได้', 'โบนัส', 'รับ'];
-    
-    for (let keyword of incomeKeywords) {
-        if (desc.includes(keyword)) {
-            type = 'income';
-            break;
-        }
-    }
+// ตัวแปรหักเปอร์เซ็นต์การออมเงินอัตโนมัติ
+let currentSavingPercent = parseFloat(localStorage.getItem('finvoice_saving_percent') || '10');
 
-    // ค้นหาหมวดหมู่โดยอัตโนมัติจากคีย์เวิร์ดที่ตั้งไว้ด้านบน
-    let category = 'อื่นๆ';
-    const targetCats = type === 'income' ? CATEGORIES_INCOME : CATEGORIES_EXPENSE;
-    
-    for (let cat in targetCats) {
-        for (let keyword of targetCats[cat]) {
-            if (desc.includes(keyword)) {
-                category = cat;
-                break;
-            }
-        }
-    }
-
-    return {
-        id: Date.now(),
-        desc: desc,
-        amount: amount,
-        type: type,
-        category: category,
-        date: new Date().toISOString()
-    };
-}
-
-// 2. ฟังก์ชันตั้งค่าระบบไมโครโฟนรับเสียงภาษาไทย (Speech Recognition)
-function initVoiceRecognition() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        console.log("เบราว์เซอร์นี้ไม่รองรับระบบสั่งการด้วยเสียง");
-        return;
-    }
-
-    recognition = new SpeechRecognition();
-    recognition.lang = 'th-TH'; // กำหนดเป็นภาษาไทย
-    recognition.continuous = false; // ปิดเพื่อให้ประมวลผลทันทีเมื่อพูดจบประโยคสั้น
-    recognition.interimResults = false;
-
-    // ตัวอย่างเหตุการณ์เมื่อพูดเสร็จแล้ว
-    recognition.onresult = function(event) {
-        let resultText = event.results[0][0].transcript;
-        
-        // นำข้อความที่พูดไปใส่ในช่องกรอก (Input Box) ในแอปของคุณ
-        // *หมายเหตุ: ตรวจสอบและเปลี่ยน ID ให้ตรงกับกล่องข้อความในแอปของคุณ*
-        const inputField = document.querySelector('.text-input'); 
-        if (inputField) {
-            inputField.value = resultText;
-            
-            // สั่งวิเคราะห์ผลทันทีหลังจากพูดจบ
-            let parsedData = parseVoiceText(resultText);
-            console.log("วิเคราะห์ผลลัพธ์:", parsedData);
-            // แสดงหน้าต่าง preview ข้อมูลเพื่อกดบันทึกต่อไป...
-        }
-    };
-}
-
-// เรียกใช้งานระบบเสียงทันทีเมื่อเปิดแอป
-document.addEventListener('DOMContentLoaded', () => {
-    initVoiceRecognition();
-/ ดึงค่าและตั้งค่าดรอปดาวน์ออมเงินให้จำค่าล่าสุดเมื่อเปิดแอป
-  const savedPercent = localStorage.getItem('finvoice_saving_percent') || '10';
-  const selectBox = document.getElementById('savingPercentSelect');
-  if (selectBox) selectBox.value = savedPercent;  
-});
-// ===== MONTHS =====
-const MONTHS_TH = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-const MONTHS_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-
-function updateMonthLabel() {
-  document.getElementById('monthLabel').textContent = MONTHS_TH[currentMonth] + ' ' + (currentYear + 543);
-}
-function changeMonth(d) {
-  currentMonth += d;
-  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
-  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
-  updateMonthLabel();
-  renderAll();
-}
-
-// ===== TABS =====
-function switchTab(tab) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('page-' + tab).classList.add('active');
-  const tabs = ['home','history','chart'];
-  document.querySelectorAll('.tab')[tabs.indexOf(tab)].classList.add('active');
-  if (tab === 'chart') renderCharts();
-}
-
-// ===== PARSE =====
-function parseText(text) {
-  if (!text || text.trim().length < 2) return null;
-  text = text.trim();
-
-  // detect type
-  const incomeKw = ['รับ','รายรับ','ได้รับ','โอนเข้า','เงินเดือน','ขาย','รายได้','รับเงิน','โบนัส','เข้า','income'];
-  const expenseKw = ['จ่าย','ค่า','ซื้อ','ใช้จ่าย','เสีย','รายจ่าย','โอนออก','expense'];
-  let type = 'expense';
-  for (const kw of incomeKw) if (text.includes(kw)) { type = 'income'; break; }
-  for (const kw of expenseKw) if (text.includes(kw)) { type = 'expense'; break; }
-
-  // extract amount — handles Thai words like บาท, ฿, k
-  let amount = 0;
-  const numMatch = text.match(/(\d[\d,]*(?:\.\d+)?)\s*(?:k|K|พัน|หมื่น|แสน|ล้าน)?/g);
-  if (numMatch) {
-    for (const m of numMatch) {
-      let n = parseFloat(m.replace(/,/g, ''));
-      if (/k|K/i.test(m)) n *= 1000;
-      if (/พัน/.test(m)) n *= 1000;
-      if (/หมื่น/.test(m)) n *= 10000;
-      if (/แสน/.test(m)) n *= 100000;
-      if (n > amount) amount = n;
+function changeSavingPercent() {
+  const select = document.getElementById('savingPercentSelect');
+  if (select) {
+    currentSavingPercent = parseFloat(select.value);
+    localStorage.setItem('finvoice_saving_percent', currentSavingPercent);
+    if (typeof showToast === 'function') {
+      showToast(`🎯 ปรับเป้าหมายออมเงินเป็น ${currentSavingPercent}% แล้ว`);
     }
   }
-
-  // clean description— ลบเฉพาะคำว่า "บาท" และสัญลักษณ์เงินแบบปลอดภัย ไม่ลบ บ.ใบไม้ ตัวอื่น
-  let desc = text.replace(/\d[\d,]*(?:\.\d+)?(?:\s*(?:k|K|บาท|฿))?/g, '')
-                 .replace(/บาท/g, '')
-                 .replace(/฿/g, '')
-                 .trim();
-  if (!desc || desc.length < 2) desc = type === 'income' ? 'รายรับ' : 'รายจ่าย';
-  // categorize
-  const cats = type === 'income' ? CATEGORIES_INCOME : CATEGORIES_EXPENSE;
-  let category = 'อื่นๆ';
-  outer: for (const [cat, kws] of Object.entries(cats)) {
-    for (const kw of kws) if (text.includes(kw)) { category = cat; break outer; }
-  }
-
-  return { type, amount, desc, category, date: new Date().toISOString().split('T')[0], id: Date.now() };
 }
 
-function syncTranscript() {
-  document.getElementById('transcriptBox').textContent = document.getElementById('textInput').value || 'ตัวอย่าง: "จ่ายค่าอาหาร 150 บาท" หรือ "รับเงิน 5000 จากลูกค้า"';
-}
-
-function parseEntry() {
-  const text = document.getElementById('textInput').value || document.getElementById('transcriptBox').textContent;
-  if (!text || text.includes('ตัวอย่าง')) { showToast('⚠️ กรุณากรอกรายการก่อน'); return; }
-  const entry = parseText(text);
-  if (!entry || entry.amount <= 0) { showToast('⚠️ ไม่พบจำนวนเงิน — ลองพิมพ์ใหม่'); return; }
-  pendingEntry = entry;
-  showPreview(entry);
-}
-
-function showPreview(e) {
-  document.getElementById('previewCard').classList.add('visible');
-  document.getElementById('previewType').innerHTML = `<span class="type-badge ${e.type}">${e.type === 'income' ? '💚 รายรับ' : '🔴 รายจ่าย'}</span>`;
-  document.getElementById('previewDesc').textContent = e.desc;
-  document.getElementById('previewAmount').textContent = '฿' + e.amount.toLocaleString();
-  document.getElementById('previewCat').textContent = (CAT_ICONS[e.category] || '📝') + ' ' + e.category;
-  document.getElementById('previewDate').textContent = formatDate(e.date);
-  const btn = document.getElementById('confirmBtn');
-  btn.className = 'confirm-btn' + (e.type === 'expense' ? ' expense-confirm' : '');
-}
-
+// แทรกระบบตัดเงินออมอัตโนมัติเข้าไปในระบบบันทึกเงินหลักอย่างปลอดภัย
 function confirmEntry() {
   if (!pendingEntry) return;
-  // 1. บันทึกรายการหลัก (รายรับ หรือ รายจ่าย) เข้าไปก่อน
+
+  // 1. บันทึกรายการหลักลงไปก่อน
   entries.unshift(pendingEntry);
-  // 🛡️ [เพิ่มระบบหักเงินออมอัตโนมัติ] ทำงานเฉพาะเมื่อรายการหลักคือ "รายรับ (income)"
+
+  // 🛡️ หากรายการหลักคือ "รายรับ (income)" ให้ทำการตัดยอดออมทันที
   if (pendingEntry.type === 'income') {
-    // คำนวณยอดออมเงิน (อ้างอิงจากตัวแปร currentSavingPercent ที่เราตั้งค่าไว้)
     const savingPercent = parseFloat(localStorage.getItem('finvoice_saving_percent') || '10');
     const savingAmount = (pendingEntry.amount * savingPercent) / 100;
 
     if (savingAmount > 0) {
-      // สร้างรายการหักออมอัตโนมัติ
       const savingEntry = {
-        id: Date.now() + 1, // ป้องกัน ID ซ้ำ
+        id: Date.now() + 1,
         desc: `🔒 หักออมอัตโนมัติ (${savingPercent}%) จาก: ${pendingEntry.desc}`,
         amount: savingAmount,
-        type: 'expense', // ตีเป็นยอดที่ถูกแยกหักออกไปเก็บเพื่อไม่ให้เอามาใช้จ่าย
-        category: 'เงินออม', // แยกหมวดหมู่ชัดเจน
+        type: 'expense', // ตีเป็นยอดโอนไปเก็บแยกบัญชีกินใช้
+        category: 'เงินออม',
         date: pendingEntry.date
       };
-      // บันทึกเงินออมตามเข้าไปในระบบทันที
       entries.unshift(savingEntry);
     }
   }
-  // 2. เซฟข้อมูล บันทึกค่า และเคลียร์หน้าจอ (โค้ดเดิมของคุณ)
-  save();
-  showToast(pendingEntry.type === 'income' ? '✅ บันทึกรายรับแล้ว' : '✅ บันทึกรายจ่ายแล้ว');
-  document.getElementById('previewCard').classList.remove('visible');
-  document.getElementById('textInput').value = '';
-  document.getElementById('transcriptBox').textContent = 'ตัวอย่าง: "จ่ายค่าอาหาร 150 บาท" หรือ "รับเงิน 5000 จากลูกค้า"';
+
+  // 2. เซฟค่าและเคลียร์หน้าจอตามโค้ดเดิมทั้งหมด
+  if (typeof save === 'function') save();
+  if (typeof showToast === 'function') {
+    showToast(pendingEntry.type === 'income' ? '✅ บันทึกรายรับแล้ว' : '✅ บันทึกรายจ่ายแล้ว');
+  }
+  
+  const pCard = document.getElementById('previewCard');
+  if (pCard) pCard.classList.remove('visible');
+  
+  const tInput = document.getElementById('textInput');
+  if (tInput) tInput.value = '';
+  
+  const tBox = document.getElementById('transcriptBox');
+  if (tBox) tBox.textContent = 'ตัวอย่าง: "จ่ายค่าอาหาร 150 บาท" หรือ "รับเงิน 5000 จากลูกค้า"';
+  
   pendingEntry = null;
-  renderAll();
+  if (typeof renderAll === 'function') renderAll();
 }
 
-// ===== VOICE =====
-function setupVoice() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) return;
-  recognition = new SR();
-  recognition.lang = 'th-TH';
-  recognition.continuous = true;
-  recognition.interimResults = false;
-  recognition.onresult = e => {
-    let t = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript;
-    document.getElementById('transcriptBox').textContent = t;
-    document.getElementById('textInput').value = t;
-    if (e.results[e.results.length - 1].isFinal) { stopRecord(); parseEntry(); }
-  };
-  recognition.onerror = () => { stopRecord(); showToast('⚠️ ไม่สามารถจับเสียงได้'); };
-  recognition.onend = () => stopRecord();
-}
-
-function toggleRecord() {
-  if (!recognition) { showToast('⚠️ เบราว์เซอร์นี้ไม่รองรับการรับเสียง'); return; }
-  isRecording ? stopRecord() : startRecord();
-}
-
-function startRecord() {
-  isRecording = true;
-  recognition.start();
-  document.getElementById('micBtn').className = 'mic-btn recording';
-  document.getElementById('voiceHint').textContent = '🔴 กำลังฟัง... พูดได้เลย';
-  document.getElementById('transcriptBox').textContent = '';
-}
-
-function stopRecord() {
-  isRecording = false;
-  if (recognition) try { recognition.stop(); } catch(e) {}
-  document.getElementById('micBtn').className = 'mic-btn idle';
-  document.getElementById('voiceHint').textContent = 'กดปุ่มไมค์เพื่อพูด หรือพิมพ์ด้านล่าง';
-}
-
-// ===== RENDER =====
-function getMonthEntries() {
-  return entries.filter(e => {
-    const d = new Date(e.date);
-    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-  });
-}
-
-function renderAll() {
-  const me = getMonthEntries();
-  const income = me.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
-  const expense = me.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount, 0);
-  const net = income - expense;
-
-  document.getElementById('totalIncome').textContent = '฿' + income.toLocaleString();
-  document.getElementById('totalExpense').textContent = '฿' + expense.toLocaleString();
-  const netEl = document.getElementById('totalNet');
-  netEl.textContent = (net >= 0 ? '+' : '') + '฿' + net.toLocaleString();
-  netEl.className = 'card-val net ' + (net > 0 ? 'pos' : net < 0 ? 'neg' : 'zero');
-  document.getElementById('totalCount').textContent = me.length + ' รายการ';
-
-  // recent (5)
-  const recentList = document.getElementById('recentList');
-  const recent5 = me.slice(0, 5);
-  recentList.innerHTML = recent5.length ? recent5.map(e => entryHTML(e)).join('') : '<div class="empty-state">ยังไม่มีรายการในเดือนนี้<br>เริ่มบันทึกด้วยเสียงหรือข้อความได้เลย</div>';
-
-  // full list
-  let filtered = me;
-  if (currentFilter !== 'all') filtered = me.filter(e => e.type === currentFilter);
-  const fullList = document.getElementById('fullList');
-  fullList.innerHTML = filtered.length ? filtered.map(e => entryHTML(e)).join('') : '<div class="empty-state">ไม่มีรายการที่ตรงกัน</div>';
-}
-
-function entryHTML(e) {
-  const icon = CAT_ICONS[e.category] || '📝';
-  return `<div class="entry-item">
-    <div class="entry-icon ${e.type}">${icon}</div>
-    <div class="entry-info">
-      <div class="entry-desc">${e.desc}</div>
-      <div class="entry-meta">${e.category} · ${formatDate(e.date)}</div>
-    </div>
-    <div class="entry-amount ${e.type}">${e.type === 'income' ? '+' : '-'}฿${e.amount.toLocaleString()}</div>
-    <button class="del-btn" onclick="deleteEntry(${e.id})" title="ลบ">✕</button>
-  </div>`;
-}
-
-function deleteEntry(id) {
-  entries = entries.filter(e => e.id !== id);
-  save();
-  renderAll();
-  if (document.getElementById('page-chart').classList.contains('active')) renderCharts();
-  showToast('🗑️ ลบรายการแล้ว');
-}
-
-function setFilter(f) {
-  currentFilter = f;
-  ['all','income','expense'].forEach(x => document.getElementById('f-' + x).classList.toggle('active', x === f));
-  renderAll();
-}
-
-// ===== CHARTS =====
-function renderCharts() {
-  const me = getFilteredEntries();
-
-  // 7-day line chart
-  const days7 = [];
-  const incomeData = [], expenseData = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i);
-    const ds = d.toISOString().split('T')[0];
-    days7.push(MONTHS_SHORT[d.getMonth()] + ' ' + d.getDate());
-    const de = getFilteredEntries().filter(e => e.date === ds);
-    incomeData.push(de.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0));
-    expenseData.push(de.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount, 0));
-  }
-  if (lineChart) lineChart.destroy();
-  lineChart = new Chart(document.getElementById('lineChart'), {
-    type: 'line',
-    data: {
-      labels: days7,
-      datasets: [
-        { label: 'รายรับ', data: incomeData, borderColor: '#22d3a5', backgroundColor: 'rgba(34,211,165,0.1)', tension: 0.4, fill: true, pointRadius: 3 },
-        { label: 'รายจ่าย', data: expenseData, borderColor: '#f87171', backgroundColor: 'rgba(248,113,113,0.1)', tension: 0.4, fill: true, pointRadius: 3 }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
-        y: { ticks: { color: '#64748b', font: { size: 10 }, callback: v => '฿' + v.toLocaleString() }, grid: { color: 'rgba(255,255,255,0.05)' } }
-      }
-    }
-  });
-
-  // Pie — expense by category
-  const expCats = {};
-  me.filter(e => e.type === 'expense').forEach(e => { expCats[e.category] = (expCats[e.category] || 0) + e.amount; });
-  const catLabels = Object.keys(expCats);
-  const catVals = Object.values(expCats);
-  const totalExp = catVals.reduce((s, v) => s + v, 0);
-  const COLORS = ['#f87171','#fb923c','#fbbf24','#a78bfa','#818cf8','#38bdf8','#34d399','#f472b6'];
-  if (pieChart) pieChart.destroy();
-  if (catLabels.length > 0) {
-    pieChart = new Chart(document.getElementById('pieChart'), {
-      type: 'doughnut',
-      data: {
-        labels: catLabels,
-        datasets: [{ data: catVals, backgroundColor: COLORS, borderWidth: 2, borderColor: '#1e293b' }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false, cutout: '60%',
-        plugins: { legend: { display: false } }
-      }
-    });
-  } else {
-    const ctx = document.getElementById('pieChart').getContext('2d');
-    ctx.clearRect(0, 0, 400, 200);
-    ctx.fillStyle = '#64748b'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('ยังไม่มีข้อมูลรายจ่าย', 200, 100);
-  }
-
-  // Category breakdown
-  const sortedCats = catLabels.map((c, i) => ({ name: c, val: catVals[i], color: COLORS[i] })).sort((a, b) => b.val - a.val);
-  const maxVal = sortedCats[0]?.val || 1;
-  document.getElementById('catBreakdown').innerHTML = sortedCats.length
-    ? sortedCats.slice(0, 6).map(c => `
-      <div class="cat-row">
-        <div class="cat-name">${CAT_ICONS[c.name] || '📝'} ${c.name}</div>
-        <div class="cat-bar-wrap"><div class="cat-bar" style="width:${Math.round(c.val/maxVal*100)}%;background:${c.color}"></div></div>
-        <div class="cat-val">฿${c.val.toLocaleString()}</div>
-        <div class="cat-pct">${Math.round(c.val/totalExp*100)}%</div>
-      </div>`).join('')
-    : '<p style="color:var(--muted);font-size:13px;">ยังไม่มีข้อมูลรายจ่าย</p>';
-
-  // Stats
-  const income = me.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
-  const countInc = me.filter(e => e.type === 'income').length;
-  const countExp = me.filter(e => e.type === 'expense').length;
-  const avgExp = countExp ? Math.round(totalExp / countExp) : 0;
-  const savingsRate = income ? Math.round((income - totalExp) / income * 100) : 0;
-  document.getElementById('statsSummary').innerHTML = `
-    📊 รายการทั้งหมด: <strong style="color:var(--text)">${me.length} รายการ</strong><br>
-    💚 รายรับ ${countInc} รายการ รวม <strong style="color:var(--income)">฿${income.toLocaleString()}</strong><br>
-    🔴 รายจ่าย ${countExp} รายการ รวม <strong style="color:var(--expense)">฿${totalExp.toLocaleString()}</strong><br>
-    📉 รายจ่ายเฉลี่ยต่อครั้ง: <strong style="color:var(--text)">฿${avgExp.toLocaleString()}</strong><br>
-    ${income > 0 ? `💰 อัตราการออม: <strong style="color:${savingsRate >= 0 ? 'var(--income)' : 'var(--expense)'}">${savingsRate}%</strong>` : ''}
-  `;
-}
-
-// ===== UTILS =====
-function formatDate(ds) {
-  const d = new Date(ds);
-  return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear() + 543}`;
-}
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
-}
-function save() { localStorage.setItem('finvoice_entries', JSON.stringify(entries)); }
-
-// ===== SEED DATA =====
-function seedIfEmpty() {
-  if (entries.length > 0) return;
-  const today = new Date();
-  const makeDate = (daysAgo) => {
-    const d = new Date(today); d.setDate(d.getDate() - daysAgo);
-    return d.toISOString().split('T')[0];
-  };
-  const seed = [
-    { type:'income', amount:25000, desc:'เงินเดือนเดือนมิถุนา', category:'เงินเดือน', date:makeDate(3) },
-    { type:'expense', amount:3500, desc:'ค่าเช่าอพาร์ตเมนต์', category:'ที่พัก', date:makeDate(2) },
-    { type:'expense', amount:150, desc:'ข้าวกลางวันร้านส้มตำ', category:'อาหาร', date:makeDate(1) },
-    { type:'expense', amount:80, desc:'กาแฟเช้า', category:'อาหาร', date:makeDate(0) },
-    { type:'income', amount:5000, desc:'รับงาน Freelance Design', category:'รายได้ธุรกิจ', date:makeDate(5) },
-    { type:'expense', amount:450, desc:'น้ำมันรถ', category:'เดินทาง', date:makeDate(4) },
-    { type:'expense', amount:1200, desc:'ช้อปปิ้ง Lazada', category:'ช้อปปิ้ง', date:makeDate(6) },
-    { type:'expense', amount:2500, desc:'ค่าไฟค่าน้ำ', category:'สาธารณูปโภค', date:makeDate(7) },
-  ];
-  entries = seed.map((e, i) => ({ ...e, id: Date.now() - i * 1000 }));
-  save();
-}
+// ตั้งค่าดรอปดาวน์ให้จำค่าเดิมเสมอเมื่อเปิดแอปพลิเคชันขึ้นมาครั้งแรก
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof initVoiceRecognition === 'function') initVoiceRecognition();
+  
+  const savedPercent = localStorage.getItem('finvoice_saving_percent') || '10';
+  const selectBox = document.getElementById('savingPercentSelect');
+  if (selectBox) selectBox.value = savedPercent;
+});
 
 // ===== INIT =====
 setupVoice();
