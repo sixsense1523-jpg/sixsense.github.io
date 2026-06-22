@@ -311,8 +311,8 @@ function changeViewType(type) {
   if (type === 'year') document.getElementById('tabYear').classList.add('active');
   
   // สั่งให้ระบบคำนวณและอัปเดตข้อมูลบนหน้าจอใหม่ตามเวลาที่เลือก
-  if (typeof render === 'function') render(); 
-  if (typeof updateCharts === 'function') updateCharts(); 
+  if (typeof renderAll === 'function') renderAll(); 
+  if (typeof renderCharts === 'function') renderCharts(); 
 }
   function getFilteredEntries() {
   const now = new Date();
