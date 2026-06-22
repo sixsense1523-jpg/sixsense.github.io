@@ -323,7 +323,6 @@ function parseVoiceText(text) {
     
     // หาข้อความอธิบายรายการ โดยการลบตัวเลขและคำว่า "บาท" ออกแบบปลอดภัย
     let desc = cleanText.replace(/\d+([,.]\d+)?/g, '').replace(/บาท/g, '').trim();
-    
     // ป้องกันกรณีคำอธิบายว่างเปล่า
     if (desc === "") desc = "รายการทั่วไป";
 
@@ -447,10 +446,12 @@ function parseText(text) {
     }
   }
 
-  // clean description
-  let desc = text.replace(/\d[\d,]*(?:\.\d+)?(?:\s*(?:k|K|บาท|฿))?/g, '').replace(/[\u0E1A\u0E32\u0E17฿]/g, '').trim();
+  // clean description— ลบเฉพาะคำว่า "บาท" และสัญลักษณ์เงินแบบปลอดภัย ไม่ลบ บ.ใบไม้ ตัวอื่น
+  let desc = text.replace(/\d[\d,]*(?:\.\d+)?(?:\s*(?:k|K|บาท|฿))?/g, '')
+                 .replace(/บาท/g, '')
+                 .replace(/฿/g, '')
+                 .trim();
   if (!desc || desc.length < 2) desc = type === 'income' ? 'รายรับ' : 'รายจ่าย';
-
   // categorize
   const cats = type === 'income' ? CATEGORIES_INCOME : CATEGORIES_EXPENSE;
   let category = 'อื่นๆ';
