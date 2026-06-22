@@ -119,13 +119,27 @@
   </div>
 </div>
 
-<!-- เพิ่มแผงปุ่มแท็บเลือกช่วงเวลา สัปดาห์ / เดือน / ปี ไว้ตรงนี้ -->
+<!-- ปุ่มแท็บเลือกช่วงเวลา สัปดาห์ / เดือน / ปี ไว้ตรงนี้ -->
 <div class="tabs" style="margin-top: 4px; padding: 0 20px;">
   <button class="tab" id="tabWeek" onclick="changeViewType('week')">สัปดาห์นี้</button>
   <button class="tab active" id="tabMonth" onclick="changeViewType('month')">เดือนนี้</button>
   <button class="tab" id="tabYear" onclick="changeViewType('year')">ปีนี้</button>
 </div>
- 
+ <!-- วางแผนออมเงินอัตโนมัติ -->
+<div class="card" style="margin: 10px 20px; background: var(--surface2);">
+  <div class="card-label" style="color: var(--income);">🛡️ ระบบออมเงินอัตโนมัติก่อนใช้</div>
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+    <span style="font-size: 13px; color: var(--muted);">สัดส่วนการออมปัจจุบัน:</span>
+    <select id="savingPercentSelect" onchange="changeSavingPercent()" style="background: var(--surface); color: var(--text); border: 1px solid var(--border); padding: 4px 8px; border-radius: 6px; font-weight: 600;">
+      <option value="10">10% (เริ่มต้นสร้างนิสัย)</option>
+      <option value="15">15% (ท้าทายตัวเอง)</option>
+      <option value="20">20% (นักออมมืออาชีพ)</option>
+    </select>
+  </div>
+  <div style="font-size: 11px; color: var(--muted); margin-top: 6px; font-style: italic;">
+    *เมื่อมีรายรับเข้ามา ระบบจะหักเงินออมเข้ากองทุนออมให้อัตโนมัติทันที
+  </div>
+</div>
   <!-- Summary -->
   <div class="summary">
     <div class="card">
@@ -411,6 +425,10 @@ function initVoiceRecognition() {
 // เรียกใช้งานระบบเสียงทันทีเมื่อเปิดแอป
 document.addEventListener('DOMContentLoaded', () => {
     initVoiceRecognition();
+/ ดึงค่าและตั้งค่าดรอปดาวน์ออมเงินให้จำค่าล่าสุดเมื่อเปิดแอป
+  const savedPercent = localStorage.getItem('finvoice_saving_percent') || '10';
+  const selectBox = document.getElementById('savingPercentSelect');
+  if (selectBox) selectBox.value = savedPercent;  
 });
 // ===== MONTHS =====
 const MONTHS_TH = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
@@ -505,7 +523,29 @@ function showPreview(e) {
 
 function confirmEntry() {
   if (!pendingEntry) return;
+  // 1. บันทึกรายการหลัก (รายรับ หรือ รายจ่าย) เข้าไปก่อน
   entries.unshift(pendingEntry);
+  // 🛡️ [เพิ่มระบบหักเงินออมอัตโนมัติ] ทำงานเฉพาะเมื่อรายการหลักคือ "รายรับ (income)"
+  if (pendingEntry.type === 'income') {
+    // คำนวณยอดออมเงิน (อ้างอิงจากตัวแปร currentSavingPercent ที่เราตั้งค่าไว้)
+    const savingPercent = parseFloat(localStorage.getItem('finvoice_saving_percent') || '10');
+    const savingAmount = (pendingEntry.amount * savingPercent) / 100;
+
+    if (savingAmount > 0) {
+      // สร้างรายการหักออมอัตโนมัติ
+      const savingEntry = {
+        id: Date.now() + 1, // ป้องกัน ID ซ้ำ
+        desc: `🔒 หักออมอัตโนมัติ (${savingPercent}%) จาก: ${pendingEntry.desc}`,
+        amount: savingAmount,
+        type: 'expense', // ตีเป็นยอดที่ถูกแยกหักออกไปเก็บเพื่อไม่ให้เอามาใช้จ่าย
+        category: 'เงินออม', // แยกหมวดหมู่ชัดเจน
+        date: pendingEntry.date
+      };
+      // บันทึกเงินออมตามเข้าไปในระบบทันที
+      entries.unshift(savingEntry);
+    }
+  }
+  // 2. เซฟข้อมูล บันทึกค่า และเคลียร์หน้าจอ (โค้ดเดิมของคุณ)
   save();
   showToast(pendingEntry.type === 'income' ? '✅ บันทึกรายรับแล้ว' : '✅ บันทึกรายจ่ายแล้ว');
   document.getElementById('previewCard').classList.remove('visible');
@@ -616,7 +656,7 @@ function setFilter(f) {
 
 // ===== CHARTS =====
 function renderCharts() {
-  const me = getMonthEntries();
+  const me = getFilteredEntries();
 
   // 7-day line chart
   const days7 = [];
@@ -625,7 +665,7 @@ function renderCharts() {
     const d = new Date(); d.setDate(d.getDate() - i);
     const ds = d.toISOString().split('T')[0];
     days7.push(MONTHS_SHORT[d.getMonth()] + ' ' + d.getDate());
-    const de = entries.filter(e => e.date === ds);
+    const de = getFilteredEntries().filter(e => e.date === ds);
     incomeData.push(de.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0));
     expenseData.push(de.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount, 0));
   }
